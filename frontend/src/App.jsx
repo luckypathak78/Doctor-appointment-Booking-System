@@ -8,10 +8,12 @@ import Contact from './pages/Contact'
 import Myprofile from './pages/Myprofile'
 import MyAppointmnets from './pages/MyAppointments'
 import Appointment from './pages/Appointment'
+import Navbar from './components/Navbar'
 
 const App = () => {
   return (
     <div className='mx-4 sm:mx-[10%]'>
+      <Navbar/>
 
       <Routes>
         <Route path='/' element={<Home />}/>
@@ -23,6 +25,7 @@ const App = () => {
         <Route path='/my-profile' element={<Myprofile />}/>
         <Route path='/my-appointments' element={<MyAppointmnets />}/>
         <Route path='/appointment/:docID' element={<Appointment />}/>
+        
       </Routes>
      </div>
   )
