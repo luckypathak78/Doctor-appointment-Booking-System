@@ -3,10 +3,10 @@ import bcrypt from "bcrypt"
 import { v2 as cloudinary } from "cloudinary"
 import doctorModel from "../models/doctorModel.js"
 import jwt from "jsonwebtoken"
+import appointmentModel from "../models/appointmentModel.js"
 
-// ===============================
 // ADD DOCTOR CONTROLLER
-// ===============================
+
 const addDoctor = async (req, res) => {
   try {
     const {
@@ -55,24 +55,18 @@ const addDoctor = async (req, res) => {
       })
     }
 
-    // ===============================
     // HASH PASSWORD
-    // ===============================
     const salt = await bcrypt.genSalt(10)
     const hashedPassword = await bcrypt.hash(password, salt)
-
-    // ===============================
     // CLOUDINARY UPLOAD
-    // ===============================
+    
     const imageUpload = await cloudinary.uploader.upload(image.path, {
       resource_type: "image",
     })
 
     const imageUrl = imageUpload.secure_url
 
-    // ===============================
     // SAVE DOCTOR
-    // ===============================
     const doctorData = {
       name,
       email: cleanEmail,
@@ -97,9 +91,7 @@ const addDoctor = async (req, res) => {
   }
 }
 
-// ===============================
 // ADMIN LOGIN
-// ===============================
 const loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body
@@ -136,7 +128,84 @@ const allDoctors = async (req, res) => {
     res.json({ success: false, message: error.message })
   }
 }
+//API to get all appointment list
+const appointmentsAdmin = async (req,res) => {
+
+  try  {
+
+    const appointments = await appointmentModel.find({})
+    .populate('docData')
+    .populate('userData')
+    res.json({success:true,appointments})
+
+  } catch (error) {
+    console.log(error)
+   res.json({success:false,message:error.message})
+  }
+}
 
 
-export { addDoctor, loginAdmin, allDoctors }
+//API to cancel appointment
+
+const appointmentCancel = async (req, res) => {
+  try {
+    const userId = req.userId
+    const { appointmentId } = req.body
+
+    //  Get appointment
+    const appointmentData = await appointmentModel.findById(appointmentId)
+
+    if (!appointmentData) {
+      return res.json({ success: false, message: 'Appointment not found' })
+    }
+
+    //  Authorization check
+    if (appointmentData.userId.toString() !== userId) {
+      return res.json({ success: false, message: 'Unauthorized action' })
+    }
+
+    //  Already cancelled protection
+    if (appointmentData.cancelled) {
+      return res.json({ success: false, message: 'Appointment already cancelled' })
+    }
+
+    //  Cancel appointment
+    await appointmentModel.findByIdAndUpdate(appointmentId, { cancelled: true })
+
+    //  Release doctor slot
+    const { docId, slotDate, slotTime } = appointmentData
+
+    const doctorData = await doctorModel.findById(docId)
+
+    if (!doctorData) {
+      return res.json({ success: false, message: 'Doctor not found' })
+    }
+
+    let slots_booked = doctorData.slots_booked || {}
+
+    // if date exists
+    if (slots_booked[slotDate]) {
+      slots_booked[slotDate] = slots_booked[slotDate].filter(
+        (time) => time !== slotTime
+      )
+
+      // remove date if empty
+      if (slots_booked[slotDate].length === 0) {
+        delete slots_booked[slotDate]
+      }
+    }
+
+    await doctorModel.findByIdAndUpdate(docId, { slots_booked })
+
+    res.json({ success: true, message: 'Appointment Cancelled' })
+
+  } catch (error) {
+    console.log(error)
+    res.json({ success: false, message: error.message })
+  }
+}
+
+
+
+export { addDoctor, loginAdmin, allDoctors, appointmentsAdmin, appointmentCancel }
 
